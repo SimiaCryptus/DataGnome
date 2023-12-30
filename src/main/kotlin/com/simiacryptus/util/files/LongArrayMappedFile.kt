@@ -5,13 +5,13 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 
-class LongArrayMappedFile(file: File, count: Long) {
+class LongArrayMappedFile(file: File, count: ElementIndex) {
 
   private val mappedByteBuffer by lazy {
-    channel.map(FileChannel.MapMode.READ_WRITE, 0, 4 * length)
+    channel.map(FileChannel.MapMode.READ_WRITE, 0, 4 * length.element)
   }
 
-  private var length : Long = -1
+  private var length : ElementIndex = ElementIndex(-1)
   fun getLength() = length
 
   private val channel by lazy {
@@ -19,25 +19,25 @@ class LongArrayMappedFile(file: File, count: Long) {
       initialize(file, count)
       count
     } else {
-      file.length() / 4
+      ElementIndex(file.length() / 4)
     }
     FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ)
   }
 
-  fun get(position: Long): Long {
-    require(position >= 0) { "Index out of bounds: $position" }
+  fun get(position: ElementIndex): Long {
+    require(position.element >= 0) { "Index out of bounds: $position" }
     require(position < length) { "Index out of bounds: $position / $length" }
-    val idx = 4 * position
+    val idx = 4 * position.element
     val value = mappedByteBuffer.getInt(idx.toInt()).toLong()
     require(value >= 0) { "Index out of bounds: $value @$position" }
-    require(value < length) { "Index out of bounds: $value / $length @$position" }
+    require(value < length.element) { "Index out of bounds: $value / $length @$position" }
     return value
   }
 
-  fun set(position: Long, value: Long) {
-    require(position >= 0) { "Index out of bounds: $position" }
+  fun set(position: ElementIndex, value: Long) {
+    require(position.element >= 0) { "Index out of bounds: $position" }
     require(position < length) { "Index out of bounds: $position / $length" }
-    mappedByteBuffer.putInt(4 * position.toInt(), value.toInt())
+    mappedByteBuffer.putInt(4 * position.element.toInt(), value.toInt())
   }
 
   fun close() {
@@ -46,7 +46,7 @@ class LongArrayMappedFile(file: File, count: Long) {
   }
 
   companion object {
-    fun initialize(file: File, count: Long) {
+    fun initialize(file: File, count: ElementIndex) {
       file.createNewFile()
       file.setWritable(true)
       file.setReadable(true)
@@ -54,7 +54,7 @@ class LongArrayMappedFile(file: File, count: Long) {
       file.outputStream().buffered().use { out ->
         val byteArray = ByteArray(4)
         val wrap = ByteBuffer.wrap(byteArray)
-        (0 until count).forEach { i ->
+        (0 until count.element).forEach { i ->
           wrap.clear()
           wrap.putInt(-1)
           out.write(byteArray)

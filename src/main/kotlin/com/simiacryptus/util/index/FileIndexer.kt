@@ -1,5 +1,6 @@
 package com.simiacryptus.util.index
 
+import com.simiacryptus.util.files.ElementIndex
 import com.simiacryptus.util.files.LongArrayMappedFile
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -12,47 +13,55 @@ class FileIndexer(
 ) {
 
   val characters: Set<String> by lazy {
-    data.tokenIterator(0).invoke().asSequence().take(data.tokenCount.toInt()).toSet()
+    data.tokenIterator(TokenCount(0)).invoke().asSequence().take(data.tokenCount.tokenIndex.toInt()).toSet()
   }
 
   /**
    * Sorts the file points in the index file to match the (infinite circular) substring at the given position.
    */
-  fun buildIndex(n: Int = 2) {
+  fun buildIndex(n: CharPosition = CharPosition(2)) {
+    val indexLength = index.getLength().let { if (it.element < 0) ElementIndex(data.tokenCount.tokenIndex) else it }
     populateIndex(
-      parent = populateByScan(n = n, skip = 0, from = 0L, to = index.getLength(), indices = data.indices),
+      parent = populateByScan(
+        n = n,
+        skip = CharPosition(0),
+        from = ElementIndex(0L),
+        to = indexLength,
+        indices = (0 until data.tokenCount.tokenIndex).map { TokenCount(it) }),
       n = n,
       skip = n,
-      from = 0
+      from = ElementIndex(0L)
     )
   }
 
-  fun find(sequence: CharSequence): Array<Long> {
-    var start = 0L
-    var end = index.getLength()
+  fun find(sequence: CharSequence): Array<TokenCount> {
+    var start = ElementIndex(0L)
+    var end = ElementIndex(index.getLength().element)
     while (start < end) {
-      val mid = (start + end) / 2
-      val midVal = data.readString(index.get(mid), sequence.length)
+      val mid = ElementIndex((start + end).element / 2)
+      val midVal = data.readString(TokenCount(index.get(mid)), CharPosition(sequence.length.toLong()))
       when {
         midVal < sequence -> start = mid + 1
         midVal > sequence -> end = mid
         else -> {
           // Find the start of the sequence
           var i = mid
-          var buffer : String = ""
+          var buffer: String = ""
           while (i > 0) {
-            buffer = data.readString(index.get(i - 1), sequence.length)
+            buffer = data.readString(TokenCount(index.get(i - 1)), CharPosition(sequence.length.toLong()))
             if (buffer != sequence) break
-            i--
+            i -= 1
           }
           // Find the end of the sequence
           var j = mid
           while (j < index.getLength()) {
-            buffer = data.readString(index.get(j + 1), sequence.length)
+            buffer = data.readString(TokenCount(index.get(j + 1)), CharPosition(sequence.length.toLong()))
             if (buffer != sequence) break
-            j++
+            j += 1
           }
-          return (i until j + 1).map { index.get(it) }.sorted().toTypedArray()
+          return (i.element until (j + 1).element)
+            .map { ElementIndex(it) }.map { index.get(it) }.sorted().map { TokenCount(it) }
+            .toTypedArray()
         }
       }
     }
@@ -61,34 +70,34 @@ class FileIndexer(
 
   fun findCompressionPrefixes(threshold: Int, count: Int): Array<Pair<String, Int>> {
     val returnMap = TreeMap<String, Int>()
-    val map = TreeMap<String, TreeSet<Long>>()
-    for (i in 0 until index.getLength()) {
-      val lastPtrIdx = if(i <= 0) null else index.get(i - 1)
-      val currentIdx = index.get(i)
-      val nextPtrIdx = if(i >= index.getLength()-1) null else index.get(i + 1)
+    val map = TreeMap<String, TreeSet<ElementIndex>>()
+    for (i in (0 until index.getLength().element).map { ElementIndex(it) }) {
+      val lastPtrIdx = if (i <= 0) null else TokenCount(index.get(i - 1))
+      val currentIdx = TokenCount(index.get(i))
+      val nextPtrIdx = if (i >= index.getLength() - 1) null else TokenCount(index.get(i + 1))
       val lastPtr = lastPtrIdx?.run { data.tokenIterator(this) }
       val nextPtr = nextPtrIdx?.run { data.tokenIterator(this) }
       val currentPtr = data.tokenIterator(currentIdx)
       val commonPrefixA = commonPrefix(lastPtr?.invoke(), currentPtr())
       val commonPrefixB = commonPrefix(currentPtr(), nextPtr?.invoke())
-      val longestCommonPrefix = if(commonPrefixA.length > commonPrefixB.length) commonPrefixA else commonPrefixB
+      val longestCommonPrefix = if (commonPrefixA.length > commonPrefixB.length) commonPrefixA else commonPrefixB
       map.keys.filter { !longestCommonPrefix.startsWith(it) }.toTypedArray().forEach { newPrefix ->
         val size = map.remove(newPrefix)!!.size
         val fitness = prefixFitness(newPrefix, size)
-        if(fitness > threshold) {
+        if (fitness > threshold) {
           returnMap[newPrefix] = size
         }
         map.remove(newPrefix)
       }
       (0 until longestCommonPrefix.length).forEach { j ->
         val substring = longestCommonPrefix.substring(0, j)
-        map.getOrPut(substring, {TreeSet<Long>()}).add(i)
+        map.getOrPut(substring, { TreeSet<ElementIndex>() }).add(i)
       }
     }
     map.keys.toTypedArray().forEach {
       val size = map.remove(it)!!.size
       val fitness = prefixFitness(it, size)
-      if(fitness > threshold) {
+      if (fitness > threshold) {
         returnMap[it] = size
       }
     }
@@ -103,7 +112,7 @@ class FileIndexer(
   private fun collect(map: TreeMap<String, Int>, count: Int): Map<String, Int> {
     // Iteratively select the top fitness value, add it to the new map, and remove all overlapping entries
     val returnMap = TreeMap<String, Int>()
-    while(map.isNotEmpty() && returnMap.size < count) {
+    while (map.isNotEmpty() && returnMap.size < count) {
       val best = map.entries.maxByOrNull { prefixFitness(it.key, it.value) }!!
       returnMap[best.key] = best.value
       map.keys.filter { best.key.startsWith(it) || it.startsWith(best.key) }
@@ -118,7 +127,7 @@ class FileIndexer(
     val buffer = StringBuilder()
     var loopCnt = 0
     while (a.hasNext() && b.hasNext()) {
-      if(loopCnt++ > 10000) {
+      if (loopCnt++ > 10000) {
         throw IllegalStateException()
       }
       val next = a.next()
@@ -129,7 +138,11 @@ class FileIndexer(
     return buffer.toString()
   }
 
-  private fun countNGrams(n: Int, skip: Int = 0, indices: Iterable<Long>): TreeMap<CharSequence, Int> {
+  private fun countNGrams(
+    n: CharPosition,
+    skip: CharPosition = CharPosition(0),
+    indices: Iterable<TokenCount>
+  ): TreeMap<CharSequence, Int> {
     val map = TreeMap<CharSequence, Int>()
     for (position in indices) {
       val key = data.readString(position, n, skip)
@@ -138,18 +151,24 @@ class FileIndexer(
     return map
   }
 
-  private fun populateIndex(parent: TreeMap<CharSequence, Int>, n: Int, skip: Int, from: Long) {
+  private fun populateIndex(
+    parent: TreeMap<CharSequence, Int>,
+    n: CharPosition,
+    skip: CharPosition,
+    from: ElementIndex
+  ) {
     var position = from
     parent.forEach { (nGram, count) ->
       val start = position
       val end = start + count
       position = end
-      val indices = (start until end).map { index.get(it) }.toTypedArray()
+      val indices =
+        (start.element until end.element).map { ElementIndex(it) }.map { TokenCount(index.get(it)) }.toTypedArray()
       if (count > 1) {
         if (count >= 10) {
           // Sort and recurse for large blocks
-          val nextMap = populateByScan(n = n, skip = skip, from = start, to = end, indices= indices.asIterable())
-          if(nextMap.size > 1) {
+          val nextMap = populateByScan(n = n, skip = skip, from = start, to = end, indices = indices.asIterable())
+          if (nextMap.size > 1) {
             populateIndex(parent = nextMap, n = n, skip = skip + n, from = start)
             return@forEach
           }
@@ -164,28 +183,30 @@ class FileIndexer(
           }
         }
         for (i in indices.indices) {
-          index.set(start + i, indices[i])
+          index.set(start + i, indices[i].tokenIndex)
         }
       }
     }
   }
 
   private fun populateByScan(
-    n: Int,
-    skip: Int,
-    from: Long,
-    to: Long,
-    indices: Iterable<Long>,
+    n: CharPosition,
+    skip: CharPosition,
+    from: ElementIndex,
+    to: ElementIndex,
+    indices: Iterable<TokenCount>,
   ): TreeMap<CharSequence, Int> {
     val nGramCounts = countNGrams(n, skip, indices)
-    require(nGramCounts.values.sum() == (to-from).toInt())
+//    log.debug("nGramCounts sum: ${nGramCounts.values.sum()}, expected: ${(to - from).element.toInt()}")
+//    log.debug("from: $from, to: $to, to-from: ${(to - from).element}")
+    require(nGramCounts.values.sum() == (to - from).element.toInt())
     val nGramPositions = accumulatePositions(nGramCounts)
-    for (i in indices) {
-      val key = data.readString(i, n, skip)
+    for (tokenPosition in indices) {
+      val key = data.readString(tokenPosition, n, skip)
       val position = nGramPositions[key]!!
       require(position >= 0)
       require(position < (to - from))
-      index.set(from + position, i)
+      index.set(from + position, tokenPosition.tokenIndex)
       nGramPositions[key] = position + 1
     }
     return nGramCounts
@@ -200,9 +221,9 @@ class FileIndexer(
   companion object {
     val log = LoggerFactory.getLogger(FileIndexer::class.java)
 
-    fun accumulatePositions(nGramCounts: TreeMap<CharSequence, Int>): TreeMap<CharSequence, Long> {
-      val nGramPositions = TreeMap<CharSequence, Long>()
-      var position = 0L
+    fun accumulatePositions(nGramCounts: TreeMap<CharSequence, Int>): TreeMap<CharSequence, ElementIndex> {
+      val nGramPositions = TreeMap<CharSequence, ElementIndex>()
+      var position = ElementIndex(0L)
       for ((nGram, count) in nGramCounts) {
         nGramPositions[nGram] = position
         position += count
@@ -262,14 +283,14 @@ class FileIndexer(
 
 }
 
-fun FileIndexer(dataFile: File, indexFile: File = File(dataFile.parentFile, "${dataFile.name}.index") ): FileIndexer {
+fun FileIndexer(dataFile: File, indexFile: File = File(dataFile.parentFile, "${dataFile.name}.index")): FileIndexer {
   return FileIndexer(CharsetTokenFile(dataFile), indexFile)
 }
 
 fun FileIndexer(
   data: TokenFile,
   indexFile: File = File(data.file.parentFile, "${data.file.name}.index")
-) = FileIndexer(data, LongArrayMappedFile(indexFile, data.tokenCount))
+) = FileIndexer(data, LongArrayMappedFile(indexFile, ElementIndex(data.tokenCount.tokenIndex)))
 
 private operator fun CharSequence.compareTo(sequence: CharSequence): Int {
   var i = 0

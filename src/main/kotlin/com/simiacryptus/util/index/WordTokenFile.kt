@@ -15,55 +15,58 @@ class WordTokenFile(
   override val tokenIndices by lazy { indexArray.asIterable() }
 
   private val indexArray: Array<ByteIndex> by lazy {
-    val charSeq: List<Pair<ByteIndex, String?>> = (0 until fileLength.bytes).map { ByteIndex(it) }
-      .runningFold(ByteIndex(-1L) to (null as String?)) { position, index ->
-        val buffer = ByteArray(maxCharSize)
-        read(position.first, buffer)
-        val first = charset.decode(ByteBuffer.wrap(buffer)).first()
-        val size = first.toString().encodeToByteArray().size
-        (if (position.first < 0) ByteIndex(size.toLong()) else (position.first + size)) to first.toString()
+    val charSeq: List<Pair<ByteIndex, String>> = (0 until fileLength.bytes)
+      .runningFold(ByteIndex(0) to (read(ByteIndex(0)))) { position, index ->
+        val size = position.second.encodeToByteArray().size
+        val nextPos = position.first + size
+        nextPos to read(nextPos)
       }.takeWhile { it.first < fileLength }
-    val list = charSeq.zipWithNext { a, b ->
+    val list = (listOf(ByteIndex(-1) to null) + charSeq).zipWithNext { a, b ->
       when {
-        a.second == null -> ByteIndex(0L)
-        b.second == null -> a.first
-        a.second!!.isBlank() && b.second!!.isNotBlank() -> a.first
-        a.second!!.isNotBlank() && b.second!!.isBlank() -> a.first
+        b.second == null -> ByteIndex(0L)
+        a.second == null -> b.first
+        a.second!!.isBlank() && b.second!!.isNotBlank() -> b.first
+        a.second!!.isNotBlank() && b.second!!.isBlank() -> b.first
         else -> null
       }
     }.filterNotNull()
-    (list.zipWithNext { from, to ->
-      val buffer = when {
-        to < from -> ByteArray(((fileLength + to) - from).bytes.toInt())
-        else -> ByteArray((to - from).bytes.toInt())
-      }
-      read(from, buffer)
-      val string = charset.decode(ByteBuffer.wrap(buffer)).toString()
-      from
-    } + charSeq.last().first).toTypedArray()
+    list.toTypedArray<ByteIndex>()
+  }
+
+  private fun read(byteIndex: ByteIndex): String {
+    val buffer = ByteArray(maxCharSize)
+    read(byteIndex, buffer)
+    return charset.decode(ByteBuffer.wrap(buffer)).first().toString()
   }
 
   init {
     tokenCount = TokenCount(indexArray.size.toLong())
   }
 
-
+  override fun charToTokenIndex(position: CharPosition) = TokenCount(StringIterator().asSequence()
+    .runningFold(CharPosition(0)) { a, b -> a + b.length }.takeWhile { it < position }.count().toLong()
+)
   override fun readString(position: TokenCount, n: CharPosition, skip: CharPosition): String {
     val prev: ByteIndex = indexArray[position.asInt]
-    return StringIterator(prev).asSequence().runningFold("", { a, b -> a + b })
-      .dropWhile { it.length < (skip + n).charIndex }.first()
-      .drop(skip.asInt).take(n.asInt)
+    return StringIterator(prev).asSequence().runningFold("") { a, b -> a + b }
+      .dropWhile { it.length < (skip + n).charIndex }
+      .first()
+      .drop(skip.asInt)
+      .take(n.asInt)
   }
+
+  override fun tokenToCharIndex(position: TokenCount) = StringIterator().asSequence()
+    .runningFold(CharPosition(0)) { a, b -> a + b.length }.drop(position.asInt - 1).first()
 
   override fun tokenIterator(position: TokenCount): () -> Iterator<String> = {
     StringIterator(indexArray[position.asInt])
   }
 
   inner class StringIterator(
-    private val position: ByteIndex
+    private val from: ByteIndex = ByteIndex(0L)
   ) : Iterator<String> {
-    var nextPos =
-      tokenIndices.indexOf(position).apply { if (this < 0) throw IllegalArgumentException("Position $position not found") }
+    private var nextPos =
+      tokenIndices.indexOf(from).apply { if (this < 0) throw IllegalArgumentException("Position $from not found") }
 
     override fun hasNext() = true
     override fun next(): String {

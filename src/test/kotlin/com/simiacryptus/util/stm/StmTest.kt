@@ -1,4 +1,4 @@
-package com.simiacryptus.skyenet
+package com.simiacryptus.util.stm
 
 import com.simiacryptus.util.stm.Pointer
 import com.simiacryptus.util.stm.TransactionRoot

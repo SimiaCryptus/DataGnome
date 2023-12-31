@@ -1,8 +1,8 @@
 package com.simiacryptus.util.files
 
-@JvmInline value class ByteIndex(val bytes: Long) {
+@JvmInline value class ByteIndex(val bytes: Long) : Comparable<ByteIndex> {
   val bytesAsInt get() = bytes.toInt()
-  operator fun compareTo(other: ByteIndex) = bytes.compareTo(other.bytes)
+  override operator fun compareTo(other: ByteIndex) = bytes.compareTo(other.bytes)
   operator fun compareTo(other: Long) = bytes.compareTo(other)
   operator fun compareTo(other: Int) = bytes.compareTo(other)
   operator fun plus(other: ByteIndex) = ByteIndex(bytes + other.bytes)
@@ -16,3 +16,4 @@ package com.simiacryptus.util.files
   operator fun rem(other: Long) = ByteIndex(bytes % other)
 
 }
+infix fun ByteIndex.until(to: ByteIndex): Iterable<ByteIndex> = this.bytes.until(to.bytes).map { ByteIndex(it) }

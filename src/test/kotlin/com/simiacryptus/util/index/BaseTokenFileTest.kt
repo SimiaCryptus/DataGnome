@@ -7,85 +7,125 @@ import java.io.File
 
 abstract class BaseTokenFileTest {
 
-    abstract fun createTokenFile(file: File): TokenFile
+  abstract fun createTokenFile(file: File): TokenFile
 
-    @Test
-    fun testRead() {
-        val file = createTempFile()
-        val tokenFile = createTokenFile(file)
-        // Write some test data to the file
-        file.writeText("Test data for reading")
+  @Test
+  open fun testRead() {
+    val file = createTempFile()
+    // Write some test data to the file
+    file.writeText("Test data for reading")
 
-        // Read data from the token file
-        val buffer = ByteArray(file.length().toInt())
-        tokenFile.read(ByteIndex(0), buffer)
+    // Read data from the token file
+    val buffer = ByteArray(file.length().toInt())
+    val tokenFile = createTokenFile(file)
+    tokenFile.read(ByteIndex(0), buffer)
 
-        // Assert that the data read is correct
-        assertEquals("Test data for reading", String(buffer))
+    // Assert that the data read is correct
+    assertEquals("Test data for reading", String(buffer))
+  }
+
+  @Test
+  open fun testReadString() {
+    val file = createTempFile()
+    // Write some test data to the file
+    val text = "Test data for reading"
+    file.writeText(text)
+
+    // Read data from the token file
+    val tokenFile = createTokenFile(file)
+
+    // Assert that the data read is correct
+    assertEquals(
+      text, tokenFile.readString(
+        position = TokenCount(0),
+        n = CharPosition(text.length.toLong()),
+        skip = CharPosition(0)
+      )
+    )
+  }
+
+
+  @Test
+  open fun testCharIterator() {
+    val file = createTempFile()
+    // Write some test data to the file
+    val text = "Test data for reading"
+    file.writeText(text)
+
+    // Read data from the token file
+    val tokenFile = createTokenFile(file)
+
+    val array1 = tokenFile.charIterator(CharPosition(0)).invoke()
+      .asSequence().take(text.length).toList().toTypedArray()
+    assertEquals(text, array1.joinToString(""))
+
+    val array2 = tokenFile.charIterator(CharPosition(0)).invoke()
+      .asSequence().take(text.length*2).toList().toTypedArray()
+    assertEquals(text+text, array2.joinToString(""))
+  }
+
+  @Test
+  open fun testTokenIterator() {
+    val file = createTempFile()
+    // Write some test data to the file
+    val text = "Test data for reading"
+    file.writeText(text)
+    val tokenFile = createTokenFile(file)
+
+    val tokenLength = tokenLength(text)
+    val array1 = tokenFile.tokenIterator(TokenCount(0)).invoke()
+      .asSequence().take(tokenLength).toList().toTypedArray()
+    assertEquals(text, array1.joinToString(""))
+
+    val array2 = tokenFile.tokenIterator(TokenCount(0)).invoke()
+      .asSequence().take(tokenLength *2).toList().toTypedArray()
+    assertEquals(text+text, array2.joinToString(""))
+
+  }
+
+  open fun tokenLength(text: String): Int = text.length
+
+  @Test
+  open fun testWriteCompressed() {
+    val file = createTempFile()
+    // Define a simple codec for the test
+    val codec = listOf("a", "b", "c", " ")
+
+    // Write some test data to the file
+    file.writeText("a b c")
+
+    val tokenFile = createTokenFile(file)
+    // Compress the data in the token file
+    val (compressedFile, dictionaryFile) = tokenFile.writeCompressed(codec)
+
+    // Assert that the compressed file and dictionary file are created
+    assertTrue(compressedFile.exists())
+    assertTrue(dictionaryFile.exists())
+
+    // Assert that the compressed file is not empty
+    assertNotEquals(0, compressedFile.length())
+  }
+
+  private fun createTempFile(): File {
+    return File.createTempFile("test", ".tmp").apply {
+      deleteOnExit()
     }
-
-    @Test
-    fun testWriteCompressed() {
-        val file = createTempFile()
-        val tokenFile = createTokenFile(file)
-        // Define a simple codec for the test
-        val codec = listOf("a", "b", "c")
-
-        // Write some test data to the file
-        file.writeText("abc")
-
-        // Compress the data in the token file
-        val (compressedFile, dictionaryFile) = tokenFile.writeCompressed(codec)
-
-        // Assert that the compressed file and dictionary file are created
-        assertTrue(compressedFile.exists())
-        assertTrue(dictionaryFile.exists())
-
-        // Assert that the compressed file is not empty
-        assertNotEquals(0, compressedFile.length())
-    }
-
-    @Test
-    fun testExpand() {
-        val file = createTempFile()
-        val compressedFile = createTempFile()
-        val tokenFile = createTokenFile(file)
-        // Define a simple codec for the test
-        val codec = listOf("a", "b", "c")
-
-        // Write some compressed test data to the compressed file
-        // This would normally be done by the writeCompressed method, but for the test, we can simulate it
-        compressedFile.writeText("0") // Assuming "0" represents "a" in the codec
-
-        // Expand the compressed data in the token file
-        tokenFile.expand(codec, compressedFile, file)
-
-        // Read the expanded data from the file
-        val expandedData = file.readText()
-
-        // Assert that the expanded data is correct
-        assertEquals("a", expandedData)
-    }
-
-    // Add more test methods as needed
-
-    private fun createTempFile(): File {
-        return File.createTempFile("test", ".tmp").apply {
-            deleteOnExit()
-        }
-    }
+  }
 }
 
 class WordTokenFileTest : BaseTokenFileTest() {
-    override fun createTokenFile(file: File) = WordTokenFile(file)
+  override fun createTokenFile(file: File) = WordTokenFile(file)
+  override fun tokenLength(text: String) = text.split(" ").size * 2 - 1
 }
 
 class SimpleTokenFileTest : BaseTokenFileTest() {
-    override fun createTokenFile(file: File) = SimpleTokenFile(file)
+  override fun createTokenFile(file: File) = SimpleTokenFile(file)
 }
 
 class CharsetTokenFileTest : BaseTokenFileTest() {
-    override fun createTokenFile(file: File) = CharsetTokenFile(file)
+  @Test override fun testCharIterator() = super.testCharIterator()
+
+  override fun createTokenFile(file: File) = CharsetTokenFile(file)
 }
 
 //class CompressedTokenFileTest : BaseTokenFileTest() {

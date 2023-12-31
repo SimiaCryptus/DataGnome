@@ -1,8 +1,8 @@
 package com.simiacryptus.util.files
 
-@JvmInline value class ElementIndex(val element: Long) {
+@JvmInline value class ElementIndex(val element: Long) : Comparable<ElementIndex> {
   val asInt get() = element.toInt()
-  operator fun compareTo(other: ElementIndex) = element.compareTo(other.element)
+  override operator fun compareTo(other: ElementIndex) = element.compareTo(other.element)
   operator fun compareTo(other: Long) = element.compareTo(other)
   operator fun compareTo(other: Int) = element.compareTo(other)
 
@@ -17,3 +17,4 @@ package com.simiacryptus.util.files
   operator fun rem(other: Long) = ElementIndex(element % other)
   operator fun rem(other: Int) = ElementIndex(element % other)
 }
+infix fun ElementIndex.until(to: ElementIndex): Iterable<ElementIndex> = this.element.until(to.element).map { ElementIndex(it) }

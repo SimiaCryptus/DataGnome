@@ -1,8 +1,8 @@
 package com.simiacryptus.util.index
 
-@JvmInline value class CharPosition(val charIndex: Long) {
+@JvmInline value class CharPosition(val charIndex: Long) : Comparable<CharPosition> {
   val asInt get() = charIndex.toInt()
-  operator fun compareTo(other: CharPosition) = charIndex.compareTo(other.charIndex)
+  override operator fun compareTo(other: CharPosition) = charIndex.compareTo(other.charIndex)
   operator fun compareTo(other: Long) = charIndex.compareTo(other)
   operator fun compareTo(other: Int) = charIndex.compareTo(other)
   operator fun plus(other: CharPosition) = CharPosition(charIndex + other.charIndex)
@@ -15,3 +15,5 @@ package com.simiacryptus.util.index
   operator fun rem(other: Long) = CharPosition(charIndex % other)
   operator fun rem(other: Int) = CharPosition(charIndex % other)
 }
+
+infix fun CharPosition.until(to: CharPosition): Iterable<CharPosition> = this.charIndex.until(to.charIndex).map { CharPosition(it) }

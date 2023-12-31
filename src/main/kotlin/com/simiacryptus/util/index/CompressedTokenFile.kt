@@ -10,8 +10,7 @@ class  CompressedTokenFile(
   file: File,
   dictionaryFile: File,
 ) : TokenFile(file) {
-  override val tokenIndices: Iterable<ByteIndex>
-    get() = (0 until tokenCount.tokenIndex).map {
+  override val tokenIndices: Iterable<ByteIndex> get() = (0 until tokenCount.tokenIndex).map {
       val tokenPosition = TokenCount(it)
       ByteIndex(tokenPosition.tokenIndex * 4)
     }.asIterable()

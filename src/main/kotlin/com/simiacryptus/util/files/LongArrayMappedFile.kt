@@ -8,7 +8,7 @@ import java.nio.file.StandardOpenOption
 class LongArrayMappedFile(file: File, count: ElementIndex) {
 
   private val mappedByteBuffer by lazy {
-    channel.map(FileChannel.MapMode.READ_WRITE, 0, 4 * length.element)
+    channel.map(FileChannel.MapMode.READ_WRITE, 0, 4 * channel.size())
   }
 
   private var length : ElementIndex = ElementIndex(-1)
@@ -35,6 +35,7 @@ class LongArrayMappedFile(file: File, count: ElementIndex) {
   }
 
   fun set(position: ElementIndex, value: Long) {
+    require(mappedByteBuffer != null)
     require(position.element >= 0) { "Index out of bounds: $position" }
     require(position < length) { "Index out of bounds: $position / $length" }
     mappedByteBuffer.putInt(4 * position.element.toInt(), value.toInt())

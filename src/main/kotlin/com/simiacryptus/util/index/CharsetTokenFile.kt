@@ -11,9 +11,7 @@ class CharsetTokenFile(
 ) : TokenFile(file) {
   private val charset = java.nio.charset.Charset.forName(charsetName)
   override var tokenCount: TokenCount = TokenCount(-1)
-  override val tokenIndices by lazy {
-    indexArray.asIterable()
-  }
+  override val tokenIndices by lazy { indexArray.asIterable() }
 
   private val indexArray by lazy {
     (0 until fileLength.bytes).runningFold(ByteIndex(0L)) { position, index ->
@@ -30,18 +28,41 @@ class CharsetTokenFile(
   }
 
   override fun readString(position: TokenCount, n: CharPosition, skip: CharPosition): String {
-    val buffer = ByteArray(((n + skip).charIndex * maxCharSize).coerceAtMost(fileLength.bytes).toInt())
-    read(indexArray[position.tokenIndex.toInt()], buffer)
-    return charset.decode(ByteBuffer.wrap(buffer)).drop(skip.charIndex.toInt()).take(n.charIndex.toInt()).toString()
+    require(n.charIndex > 0)
+    val from = tokenToCharIndex(position) + skip
+    return readString(indexArray[from.asInt % indexArray.size], indexArray[(from + n).asInt % indexArray.size])
   }
-  //charToTokenIndex
+
+  private fun readString(
+    fromByte: ByteIndex,
+    toByte: ByteIndex
+  ): String = when {
+    toByte > fileLength -> readString(fromByte, toByte - fileLength)
+    toByte < 0L -> readString(fromByte, toByte + fileLength)
+    toByte <= 0L  && fromByte == fileLength -> ""
+    toByte <= fromByte -> when {
+      toByte <= 0L -> readString(fromByte, fileLength)
+      fromByte == fileLength -> readString(ByteIndex(0), toByte)
+      else -> readString(fromByte, fileLength) + readString(ByteIndex(0), toByte)
+    }
+    else -> {
+      val buffer = ByteArray((toByte - fromByte).bytes.toInt())
+      read(fromByte, buffer)
+      val toString = charset.decode(ByteBuffer.wrap(buffer)).toString()
+      require(toString.isNotEmpty())
+      toString
+    }
+  }
+
   override fun charToTokenIndex(position: CharPosition) = TokenCount(position.charIndex)
   override fun tokenToCharIndex(position: TokenCount)  =  CharPosition(position.tokenIndex)
 
   override fun charIterator(position: CharPosition): () -> CharIterator {
-    val initialBuffer = readString(charToTokenIndex(position), CharPosition(16.coerceAtMost(tokenCount.tokenIndex.toInt() - 1).toLong()))
     return {
       object : CharIterator() {
+        val initPos = charToTokenIndex(position)
+        val readAheadBuffer = CharPosition(16.coerceAtMost(indexArray.size - 1).toLong())
+        val initialBuffer = readString(initPos, readAheadBuffer)
         var buffer = initialBuffer
         var nextPos = position + initialBuffer.length
         var pos = 0

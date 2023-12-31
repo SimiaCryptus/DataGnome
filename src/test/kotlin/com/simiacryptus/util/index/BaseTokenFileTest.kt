@@ -1,6 +1,6 @@
 package com.simiacryptus.util.index
 
-import com.simiacryptus.util.files.ByteIndex
+import com.simiacryptus.util.files.XBytes
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.File
@@ -18,7 +18,7 @@ abstract class BaseTokenFileTest {
     // Read data from the token file
     val buffer = ByteArray(file.length().toInt())
     val tokenFile = createTokenFile(file)
-    tokenFile.read(ByteIndex(0), buffer)
+    tokenFile.read(XBytes(0), buffer)
 
     // Assert that the data read is correct
     assertEquals("Test data for reading", String(buffer))
@@ -37,9 +37,9 @@ abstract class BaseTokenFileTest {
     // Assert that the data read is correct
     assertEquals(
       text, tokenFile.readString(
-        position = TokenCount(0),
-        n = CharPosition(text.length.toLong()),
-        skip = CharPosition(0)
+        position = XTokens(0),
+        n = XChars(text.length.toLong()),
+        skip = XChars(0)
       )
     )
   }
@@ -55,11 +55,11 @@ abstract class BaseTokenFileTest {
     // Read data from the token file
     val tokenFile = createTokenFile(file)
 
-    val array1 = tokenFile.charIterator(CharPosition(0)).invoke()
+    val array1 = tokenFile.charIterator(XChars(0)).invoke()
       .asSequence().take(text.length).toList().toTypedArray()
     assertEquals(text, array1.joinToString(""))
 
-    val array2 = tokenFile.charIterator(CharPosition(0)).invoke()
+    val array2 = tokenFile.charIterator(XChars(0)).invoke()
       .asSequence().take(text.length*2).toList().toTypedArray()
     assertEquals(text+text, array2.joinToString(""))
   }
@@ -73,11 +73,11 @@ abstract class BaseTokenFileTest {
     val tokenFile = createTokenFile(file)
 
     val tokenLength = tokenLength(text)
-    val array1 = tokenFile.tokenIterator(TokenCount(0)).invoke()
+    val array1 = tokenFile.tokenIterator(XTokens(0)).invoke()
       .asSequence().take(tokenLength).toList().toTypedArray()
     assertEquals(text, array1.joinToString(""))
 
-    val array2 = tokenFile.tokenIterator(TokenCount(0)).invoke()
+    val array2 = tokenFile.tokenIterator(XTokens(0)).invoke()
       .asSequence().take(tokenLength *2).toList().toTypedArray()
     assertEquals(text+text, array2.joinToString(""))
 

@@ -1,6 +1,6 @@
 package com.simiacryptus.util.index
 
-import com.simiacryptus.util.files.ByteIndex
+import com.simiacryptus.util.files.XBytes
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -10,11 +10,11 @@ class CharsetTokenFile(
   val maxCharSize: Int = 8
 ) : TokenFile(file) {
   private val charset = java.nio.charset.Charset.forName(charsetName)
-  override var tokenCount: TokenCount = TokenCount(-1)
+  override var tokenCount: XTokens = XTokens(-1)
   override val tokenIndices by lazy { indexArray.asIterable() }
 
   private val indexArray by lazy {
-    (0 until fileLength.bytes).runningFold(ByteIndex(0L)) { position, index ->
+    (0 until fileLength.asLong).runningFold(XBytes(0L)) { position, index ->
       val buffer = ByteArray(maxCharSize)
       read(position, buffer)
       val first = charset.decode(ByteBuffer.wrap(buffer)).first()
@@ -24,29 +24,29 @@ class CharsetTokenFile(
   }
 
   init {
-    tokenCount = TokenCount(indexArray.size.toLong())
+    tokenCount = XTokens(indexArray.size.toLong())
   }
 
-  override fun readString(position: TokenCount, n: CharPosition, skip: CharPosition): String {
-    require(n.charIndex > 0)
+  override fun readString(position: XTokens, n: XChars, skip: XChars): String {
+    require(n.asLong > 0)
     val from = tokenToCharIndex(position) + skip
     return readString(indexArray[from.asInt % indexArray.size], indexArray[(from + n).asInt % indexArray.size])
   }
 
   private fun readString(
-    fromByte: ByteIndex,
-    toByte: ByteIndex
+    fromByte: XBytes,
+    toByte: XBytes
   ): String = when {
     toByte > fileLength -> readString(fromByte, toByte - fileLength)
     toByte < 0L -> readString(fromByte, toByte + fileLength)
     toByte <= 0L  && fromByte == fileLength -> ""
     toByte <= fromByte -> when {
       toByte <= 0L -> readString(fromByte, fileLength)
-      fromByte == fileLength -> readString(ByteIndex(0), toByte)
-      else -> readString(fromByte, fileLength) + readString(ByteIndex(0), toByte)
+      fromByte == fileLength -> readString(XBytes(0), toByte)
+      else -> readString(fromByte, fileLength) + readString(XBytes(0), toByte)
     }
     else -> {
-      val buffer = ByteArray((toByte - fromByte).bytes.toInt())
+      val buffer = ByteArray((toByte - fromByte).asLong.toInt())
       read(fromByte, buffer)
       val toString = charset.decode(ByteBuffer.wrap(buffer)).toString()
       require(toString.isNotEmpty())
@@ -54,14 +54,14 @@ class CharsetTokenFile(
     }
   }
 
-  override fun charToTokenIndex(position: CharPosition) = TokenCount(position.charIndex)
-  override fun tokenToCharIndex(position: TokenCount)  =  CharPosition(position.tokenIndex)
+  override fun charToTokenIndex(position: XChars) = XTokens(position.asLong)
+  override fun tokenToCharIndex(position: XTokens)  =  XChars(position.asLong)
 
-  override fun charIterator(position: CharPosition): () -> CharIterator {
+  override fun charIterator(position: XChars): () -> CharIterator {
     return {
       object : CharIterator() {
         val initPos = charToTokenIndex(position)
-        val readAheadBuffer = CharPosition(16.coerceAtMost(indexArray.size - 1).toLong())
+        val readAheadBuffer = XChars(16.coerceAtMost(indexArray.size - 1).toLong())
         val initialBuffer = readString(initPos, readAheadBuffer)
         var buffer = initialBuffer
         var nextPos = position + initialBuffer.length
@@ -70,7 +70,7 @@ class CharsetTokenFile(
         override fun nextChar(): Char {
           val char = buffer.get(pos++)
           if (pos >= buffer.length) {
-            buffer = readString(charToTokenIndex(nextPos), CharPosition(16))
+            buffer = readString(charToTokenIndex(nextPos), XChars(16))
             nextPos = nextPos + buffer.length
             pos = 0
           }

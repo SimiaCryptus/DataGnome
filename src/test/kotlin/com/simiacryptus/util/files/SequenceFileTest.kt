@@ -44,7 +44,7 @@ internal class SequenceFileTest {
 
     @Test
     fun `get with invalid index should return null`() {
-        assertNull(sequenceFile.get(ElementIndex(999)))
+        assertNull(sequenceFile.get(XElements(999)))
     }
 
     @Test

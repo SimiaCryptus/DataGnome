@@ -20,9 +20,9 @@ class SequenceFile(private val file: File) {
 
   private var read = false
   private var write = false
-  private var pos = ElementIndex(0L)
+  private var pos = XElements(0L)
 
-  fun append(str: ByteArray): ElementIndex {
+  fun append(str: ByteArray): XElements {
     mappedByteBuffer1 = null
     bufferedOutputStream.write(str.size.toBytes())
     bufferedOutputStream.write(str)
@@ -33,10 +33,10 @@ class SequenceFile(private val file: File) {
     return prev
   }
 
-  fun get(pos: ElementIndex) : ByteArray? {
+  fun get(pos: XElements) : ByteArray? {
     read = true
     var curPos = 0
-    var curIdx = ElementIndex(0)
+    var curIdx = XElements(0)
     val mappedByteBuffer = mappedByteBuffer
     val capacity = mappedByteBuffer.capacity()
     while(curIdx < pos) {

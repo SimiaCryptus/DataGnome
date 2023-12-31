@@ -5,40 +5,43 @@ import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.StandardOpenOption
 
-class LongArrayMappedFile(file: File, count: ElementIndex) {
+class LongArrayMappedFile(file: File, count: XElements) {
 
   private val mappedByteBuffer by lazy {
     channel.map(FileChannel.MapMode.READ_WRITE, 0, 4 * channel.size())
   }
 
-  private var length : ElementIndex = ElementIndex(-1)
-  fun getLength() = length
+  private var length : XElements = XElements(-1)
 
   private val channel by lazy {
     length = if (!file.exists()) {
       initialize(file, count)
       count
     } else {
-      ElementIndex(file.length() / 4)
+      XElements(file.length() / 4)
     }
     FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ)
   }
 
-  fun get(position: ElementIndex): Long {
-    require(position.element >= 0) { "Index out of bounds: $position" }
+  fun getLength(): XElements {
+    require(null != mappedByteBuffer)
+    return length
+  }
+
+  fun get(position: XElements): Long {
+    require(position.asLong >= 0) { "Index out of bounds: $position" }
     require(position < length) { "Index out of bounds: $position / $length" }
-    val idx = 4 * position.element
-    val value = mappedByteBuffer.getInt(idx.toInt()).toLong()
+    val value = mappedByteBuffer.getInt(4 * position.asInt).toLong()
     require(value >= 0) { "Index out of bounds: $value @$position" }
-    require(value < length.element) { "Index out of bounds: $value / $length @$position" }
+    require(value < length.asLong) { "Index out of bounds: $value / $length @$position" }
     return value
   }
 
-  fun set(position: ElementIndex, value: Long) {
+  fun set(position: XElements, value: Long) {
     require(mappedByteBuffer != null)
-    require(position.element >= 0) { "Index out of bounds: $position" }
+    require(position.asLong >= 0) { "Index out of bounds: $position" }
     require(position < length) { "Index out of bounds: $position / $length" }
-    mappedByteBuffer.putInt(4 * position.element.toInt(), value.toInt())
+    mappedByteBuffer.putInt(4 * position.asInt, value.toInt())
   }
 
   fun close() {
@@ -47,7 +50,7 @@ class LongArrayMappedFile(file: File, count: ElementIndex) {
   }
 
   companion object {
-    fun initialize(file: File, count: ElementIndex) {
+    fun initialize(file: File, count: XElements) {
       file.createNewFile()
       file.setWritable(true)
       file.setReadable(true)
@@ -55,7 +58,7 @@ class LongArrayMappedFile(file: File, count: ElementIndex) {
       file.outputStream().buffered().use { out ->
         val byteArray = ByteArray(4)
         val wrap = ByteBuffer.wrap(byteArray)
-        (0 until count.element).forEach { i ->
+        (0 until count.asLong).forEach { i ->
           wrap.clear()
           wrap.putInt(-1)
           out.write(byteArray)

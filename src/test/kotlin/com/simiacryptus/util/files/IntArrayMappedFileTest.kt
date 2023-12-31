@@ -13,17 +13,17 @@ internal class IntArrayMappedFileTest {
     fun testLength() {
         val tempFile = createTempDataFile(intArrayOf(1, 2, 3, 4))
         val mappedFile = IntArrayMappedFile(tempFile)
-        assertEquals(4, mappedFile.length.element)
+        assertEquals(4, mappedFile.length.asLong)
     }
 
     @Test
     fun testGet() {
         val tempFile = createTempDataFile(intArrayOf(10, 20, 30, 40))
         val mappedFile = IntArrayMappedFile(tempFile)
-        assertEquals(10, mappedFile.get(ElementIndex(0)))
-        assertEquals(20, mappedFile.get(ElementIndex(1)))
-        assertEquals(30, mappedFile.get(ElementIndex(2)))
-        assertEquals(40, mappedFile.get(ElementIndex(3)))
+        assertEquals(10, mappedFile.get(XElements(0)))
+        assertEquals(20, mappedFile.get(XElements(1)))
+        assertEquals(30, mappedFile.get(XElements(2)))
+        assertEquals(40, mappedFile.get(XElements(3)))
     }
 
     @Test

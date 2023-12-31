@@ -7,36 +7,36 @@ import java.nio.file.StandardOpenOption
 
 abstract class TokenFile(val file: File) {
 
-  val fileLength = ByteIndex(file.length())
+  val fileLength = XBytes(file.length())
 
   private val channel by lazy { FileChannel.open(file.toPath(), StandardOpenOption.READ) }
-  protected val mappedByteBuffer by lazy { channel.map(FileChannel.MapMode.READ_ONLY, 0, fileLength.bytes) }
+  protected val mappedByteBuffer by lazy { channel.map(FileChannel.MapMode.READ_ONLY, 0, fileLength.asLong) }
 
-  abstract val tokenIndices: Iterable<ByteIndex>
-  abstract val tokenCount: TokenCount
+  abstract val tokenIndices: Iterable<XBytes>
+  abstract val tokenCount: XTokens
 
 
-  fun read(i: ByteIndex, buffer: ByteArray, offset: Int = 0, length: Int = buffer.size - offset) {
+  fun read(i: XBytes, buffer: ByteArray, offset: Int = 0, length: Int = buffer.size - offset) {
     when {
       i < 0 -> read((i % fileLength) + fileLength, buffer, offset, length)
       fileLength <= i -> read(i % fileLength, buffer, offset, length)
-      fileLength < (i.bytes + length) -> {
-        val splitAt = (fileLength - i).bytes.toInt()
+      fileLength < (i.asLong + length) -> {
+        val splitAt = (fileLength - i).asLong.toInt()
         read(i, buffer, offset, splitAt)
         val remainder = length - splitAt
-        read(ByteIndex(0), buffer, offset + splitAt, remainder)
+        read(XBytes(0), buffer, offset + splitAt, remainder)
       }
 
-      else -> mappedByteBuffer.get(i.bytes.toInt(), buffer, offset, length)
+      else -> mappedByteBuffer.get(i.asLong.toInt(), buffer, offset, length)
     }
   }
 
-  open fun readString(position: TokenCount, n: CharPosition, skip: CharPosition = CharPosition(0)) =
+  open fun readString(position: XTokens, n: XChars, skip: XChars = XChars(0)) =
     tokenIterator(position).invoke().asSequence()
-      .runningFold("", { a, b -> a + b }).dropWhile { it.length < (skip + n).charIndex }.first()
-      .drop(skip.charIndex.toInt()).take(n.charIndex.toInt())
+      .runningFold("", { a, b -> a + b }).dropWhile { it.length < (skip + n).asLong }.first()
+      .drop(skip.asLong.toInt()).take(n.asLong.toInt())
 
-  open fun charIterator(position: CharPosition): () -> CharIterator {
+  open fun charIterator(position: XChars): () -> CharIterator {
     return {
       object : CharIterator() {
         val iterator = tokenIterator(charToTokenIndex(position)).invoke()
@@ -62,7 +62,7 @@ abstract class TokenFile(val file: File) {
     }
   }
 
-  open fun tokenIterator(position: TokenCount): () -> Iterator<String> {
+  open fun tokenIterator(position: XTokens): () -> Iterator<String> {
     val charIterator = charIterator(tokenToCharIndex(position))
     return {
       object : Iterator<String> {
@@ -73,8 +73,8 @@ abstract class TokenFile(val file: File) {
     }
   }
 
-  open fun charToTokenIndex(position: CharPosition): TokenCount = throw NotImplementedError(this::class.java.name)
-  open fun tokenToCharIndex(position: TokenCount): CharPosition = throw NotImplementedError(this::class.java.name)
+  open fun charToTokenIndex(position: XChars): XTokens = throw NotImplementedError(this::class.java.name)
+  open fun tokenToCharIndex(position: XTokens): XChars = throw NotImplementedError(this::class.java.name)
 
   fun close() {
     channel.close()
@@ -89,9 +89,9 @@ abstract class TokenFile(val file: File) {
     val dictionary = writeDictionary(codec)
     val prefixLookup = PrefixLookup(codec)
     val arrayFile = IntArrayAppendFile(compressedSequence)
-    var position = TokenCount(0L)
+    var position = XTokens(0L)
     while (position < tokenCount) {
-      val string = readString(position, CharPosition(maxPrefixLength.toLong()))
+      val string = readString(position, XChars(maxPrefixLength.toLong()))
       val prefix = prefixLookup.find(string)?.firstOrNull()
       prefix ?: throw IllegalStateException("No prefix found for $string")
       val value = indexMap[prefix]
@@ -107,7 +107,7 @@ abstract class TokenFile(val file: File) {
     val codec = codecMap.mapIndexed { index, str -> index to str }.toMap()
     val arrayFile = IntArrayMappedFile(compressed!!)
     val writer = file.writer()
-    var elementIndex = ElementIndex(0L)
+    var elementIndex = XElements(0L)
     while (elementIndex < arrayFile.length) {
       val index = arrayFile.get(elementIndex)
       val string = codec[index]!!
@@ -138,7 +138,7 @@ abstract class TokenFile(val file: File) {
   private fun writeDictionary(codec: List<String>): File {
     val dictionaryFile = File(file.parentFile, "${file.name}.dictionary")
     val sequenceFile = SequenceFile(dictionaryFile)
-    codec.mapIndexed { index, str -> require(sequenceFile.append(str.encodeToByteArray()) == ElementIndex(index.toLong())) }
+    codec.mapIndexed { index, str -> require(sequenceFile.append(str.encodeToByteArray()) == XElements(index.toLong())) }
     sequenceFile.close()
     return dictionaryFile
   }

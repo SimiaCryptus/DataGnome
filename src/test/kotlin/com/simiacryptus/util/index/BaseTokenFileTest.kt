@@ -113,7 +113,7 @@ abstract class BaseTokenFileTest {
   }
 }
 
-class WordTokenFileTest : BaseTokenFileTest() {
+class WordTokenFileTest2 : BaseTokenFileTest() {
   override fun createTokenFile(file: File) = WordTokenFile(file)
   override fun tokenLength(text: String) = text.split(" ").size * 2 - 1
 }

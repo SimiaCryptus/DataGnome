@@ -6,7 +6,7 @@ import com.simiacryptus.util.files.until
 
 fun FileIndexer.find(sequence: CharSequence): Array<XTokens> {
   var start = 0.elements
-  var end = index.getLength()
+  var end = index.length
   while (start < end) {
     val mid = XElements((start + end).asLong / 2)
     val midVal = data.readString(XTokens(index.get(mid)), XChars(sequence.length.toLong()))
@@ -24,7 +24,7 @@ fun FileIndexer.find(sequence: CharSequence): Array<XTokens> {
         }
         // Find the end of the sequence
         var j = mid
-        while (j < index.getLength()) {
+        while (j < index.length) {
           buffer = data.readString(XTokens(index.get(j + 1)), XChars(sequence.length.toLong()))
           if (buffer != sequence) break
           j += 1

@@ -1,6 +1,7 @@
 package com.simiacryptus.util.files
 
 import java.io.File
+import java.io.RandomAccessFile
 
 class IntArrayAppendFile(val file: File) {
 
@@ -18,9 +19,18 @@ class IntArrayAppendFile(val file: File) {
     if(isClosed) throw IllegalStateException("File is closed")
     val toBytes = value.toBytes()
     bufferedOutputStream.write(toBytes)
+   bufferedOutputStream.flush()
     length = length + 1
   }
 
+  fun read(index: Int): Int {
+    if (index < 0 || index >= length.asLong) throw IndexOutOfBoundsException("Index: $index, Length: ${length.asLong}")
+    val randomAccessFile = RandomAccessFile(file, "r")
+    randomAccessFile.seek(index * 4L)
+    val value = randomAccessFile.readInt()
+    randomAccessFile.close()
+    return value
+  }
 
   fun close() {
     isClosed = true
@@ -30,4 +40,3 @@ class IntArrayAppendFile(val file: File) {
   companion object {
   }
 }
-

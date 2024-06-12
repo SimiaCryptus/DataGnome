@@ -16,7 +16,7 @@ class WordTokenFile(
 
   private val indexArray: Array<XBytes> by lazy {
     val charSeq: List<Pair<XBytes, String>> = (0 until fileLength.asLong)
-      .runningFold(XBytes(0) to (read(XBytes(0)))) { position, index ->
+      .runningFold(XBytes(0) to "") { position, _ ->
         val size = position.second.encodeToByteArray().size
         val nextPos = position.first + size
         nextPos to read(nextPos)
@@ -33,10 +33,10 @@ class WordTokenFile(
     list.toTypedArray<XBytes>()
   }
 
-  private fun read(byteIndex: XBytes): String {
+  fun read(byteIndex: XBytes): String {
     val buffer = ByteArray(maxCharSize)
     read(byteIndex, buffer)
-    return charset.decode(ByteBuffer.wrap(buffer)).first().toString()
+   return charset.decode(ByteBuffer.wrap(buffer)).toString().takeWhile { it != '\u0000' }.trim()
   }
 
   init {
@@ -44,19 +44,15 @@ class WordTokenFile(
   }
 
   override fun charToTokenIndex(position: XChars) = XTokens(StringIterator().asSequence()
-    .runningFold(XChars(0)) { a, b -> a + b.length }.takeWhile { it < position }.count().toLong()
+    .runningFold(XChars(0)) { a, b -> a + b.length }.takeWhile { it <= position }.count().toLong()
 )
   override fun readString(position: XTokens, n: XChars, skip: XChars): String {
     val prev: XBytes = indexArray[position.asInt]
-    return StringIterator(prev).asSequence().runningFold("") { a, b -> a + b }
-      .dropWhile { it.length < (skip + n).asLong }
-      .first()
-      .drop(skip.asInt)
-      .take(n.asInt)
+   return StringIterator(prev).asSequence().drop(skip.asInt).take(n.asInt).joinToString("").trim()
   }
 
   override fun tokenToCharIndex(position: XTokens) = StringIterator().asSequence()
-    .runningFold(XChars(0)) { a, b -> a + b.length }.drop(position.asInt - 1).first()
+    .runningFold(XChars(0)) { a, b -> a + b.length }.drop(position.asInt).first()
 
   override fun tokenIterator(position: XTokens): () -> Iterator<String> = {
     StringIterator(indexArray[position.asInt])
@@ -79,9 +75,8 @@ class WordTokenFile(
       }
       read(from, buffer)
       val string = charset.decode(ByteBuffer.wrap(buffer)).toString()
-      return string
+     return string.takeWhile { it != '\u0000' }.trim()
     }
   }
 
 }
-

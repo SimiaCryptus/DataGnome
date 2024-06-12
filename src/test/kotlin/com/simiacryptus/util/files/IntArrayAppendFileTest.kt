@@ -35,4 +35,25 @@ internal class IntArrayAppendFileTest {
             intArrayAppendFile.append(42)
         }
     }
+
+    @Test
+    fun testRead() {
+        val tempFile = Files.createTempFile(null, null).toFile()
+        tempFile.deleteOnExit()
+
+        val intArrayAppendFile = IntArrayAppendFile(tempFile)
+        intArrayAppendFile.append(42)
+        intArrayAppendFile.append(-1)
+        intArrayAppendFile.append(123456)
+
+        assertEquals(42, intArrayAppendFile.read(0), "First element should be 42")
+        assertEquals(-1, intArrayAppendFile.read(1), "Second element should be -1")
+        assertEquals(123456, intArrayAppendFile.read(2), "Third element should be 123456")
+
+        assertThrows(IndexOutOfBoundsException::class.java) {
+            intArrayAppendFile.read(3)
+        }
+
+        intArrayAppendFile.close()
+    }
 }

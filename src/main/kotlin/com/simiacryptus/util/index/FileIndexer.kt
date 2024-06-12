@@ -15,8 +15,8 @@ class FileIndexer(
 ) {
 
   init {
-    require(index.getLength().asLong == data.tokenCount.asLong) {
-      "Index length ${index.getLength()} does not match token count ${data.tokenCount}"
+    require(index.length.asLong == data.tokenCount.asLong) {
+      "Index length ${index.length} does not match token count ${data.tokenCount}"
     }
   }
 
@@ -32,7 +32,7 @@ class FileIndexer(
         n = n,
         skip = 0.chars,
         from = 0.elements,
-        to = index.getLength(),
+        to = index.length,
         indices = 0.tokens until data.tokenCount
       ))
     )
@@ -159,5 +159,7 @@ fun FileIndexer(dataFile: File, indexFile: File = File(dataFile.parentFile, "${d
 fun FileIndexer(
   data: TokenFile,
   indexFile: File = File(data.file.parentFile, "${data.file.name}.index")
-) = FileIndexer(data, LongArrayMappedFile(indexFile, data.tokenCount.asLong.elements))
+) = FileIndexer(data, LongArrayMappedFile(indexFile).apply {
+  //data.tokenCount.asLong.elements
+})
 

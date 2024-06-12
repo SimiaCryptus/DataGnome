@@ -39,13 +39,16 @@ class SequenceFile(private val file: File) {
     var curIdx = XElements(0)
     val mappedByteBuffer = mappedByteBuffer
     val capacity = mappedByteBuffer.capacity()
+    if (pos.toInt() >= getSize()) return null
     while(curIdx < pos) {
       if(curPos >= capacity) return null
       val length = if (curPos + 4 <= capacity) mappedByteBuffer.getInt(curPos) else return null
+      if (curPos + length + 4 > capacity) return null
       curPos += length + 4
       curIdx += 1
     }
     val length = mappedByteBuffer.getInt(curPos)
+    if (curPos + 4 + length > capacity) return null
     curPos += 4
     val result = ByteArray(length)
     if (curPos + length > capacity) return null
@@ -70,6 +73,33 @@ class SequenceFile(private val file: File) {
       curPos += length
     }
     return result.toTypedArray()
+  }
+
+  fun getAllIndices(): List<XElements> {
+    val indices = mutableListOf<XElements>()
+    var curPos = 0
+    var curIdx = XElements(0)
+    val mappedByteBuffer = mappedByteBuffer
+    val capacity = mappedByteBuffer.capacity()
+    while (curPos < capacity) {
+      val length = mappedByteBuffer.getInt(curPos)
+      curPos += length + 4
+      indices.add(curIdx)
+      curIdx += 1
+    }
+    return indices
+  }
+
+  fun getSize(): Int {
+    return pos.toInt()
+  }
+
+  fun getIndexed(index: Int): ByteArray? {
+    return get(XElements(index.toLong()))
+  }
+
+  fun readIndexed(indices: List<Int>): List<ByteArray?> {
+    return indices.map { getIndexed(it) }
   }
 
   fun close() {

@@ -55,7 +55,7 @@ class FileIndexerTest {
     try {
       fileIndexer.buildIndex(XChars(1))
       fileIndexer.apply {
-        val strings = (0 until index.getLength().asLong).toList()
+        val strings = (0 until index.length.asLong).toList()
           .map { XChars(index.get(XElements(it))) }
           .map { data.charIterator(it) }
           .map { it.invoke().asSequence().take(data.tokenCount.asInt).joinToString("") }

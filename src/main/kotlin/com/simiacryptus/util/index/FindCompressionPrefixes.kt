@@ -8,10 +8,10 @@ import java.util.*
 fun FileIndexer.findCompressionPrefixes(threshold: Int, count: Int): Array<Pair<String, Int>> {
   val returnMap = TreeMap<String, Int>()
   val map = TreeMap<String, TreeSet<XElements>>()
-  for (elementIndex in (0.elements until index.getLength())) {
+  for (elementIndex in (0.elements until index.length)) {
     val lastPtrIdx = if (elementIndex <= 0) null else index.get(elementIndex - 1).tokens
     val currentIdx = index.get(elementIndex).tokens
-    val nextPtrIdx = if (elementIndex >= index.getLength() - 1) null else index.get(elementIndex + 1).tokens
+    val nextPtrIdx = if (elementIndex >= index.length - 1) null else index.get(elementIndex + 1).tokens
     val lastPtr = lastPtrIdx?.run { data.tokenIterator(this) }
     val nextPtr = nextPtrIdx?.run { data.tokenIterator(this) }
     val currentPtr = data.tokenIterator(currentIdx)
